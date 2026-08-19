@@ -108,9 +108,20 @@ async function peer(init){
  if(init){
    const o=await pc.createOffer();
    await pc.setLocalDescription(o);
+   $('status').textContent='Kamera verbunden – ICE wird gesammelt…';
+   await waitIceComplete(pc,7000);
    send({type:'offer',sdp:pc.localDescription});
    $('status').textContent='Kamera verbunden – WebRTC-Angebot gesendet…';
  }
+}
+function waitIceComplete(pc,timeout=6000){
+ return new Promise(resolve=>{
+   if(pc.iceGatheringState==='complete')return resolve();
+   const done=()=>{pc.removeEventListener('icegatheringstatechange',check);clearTimeout(timer);resolve();};
+   const check=()=>{if(pc.iceGatheringState==='complete')done();};
+   pc.addEventListener('icegatheringstatechange',check);
+   const timer=setTimeout(done,timeout);
+ });
 }
 async function media(){
  if(stream)return stream;

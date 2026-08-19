@@ -14,6 +14,12 @@
 .no-answers{font-size:12px;color:var(--muted)}
 .player-logo{margin:0 auto 8px}.player-subtitle{text-align:center;margin-bottom:12px}.stats{background:linear-gradient(90deg,rgba(233,196,106,.08),transparent);border:1px solid rgba(233,196,106,.14);padding:10px;border-radius:10px}#voteBox:not(.hidden),#tieBox:not(.hidden){animation:panelIn .28s ease-out}@keyframes panelIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .preview-wrap{position:relative;overflow:hidden;border-radius:12px;margin:12px 0;background:#030408}.preview-wrap video{margin:0;transition:transform .18s ease;transform-origin:center}.my-turn{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);padding:8px 15px;border-radius:999px;background:#ffb000;color:#171007;font-weight:1000;box-shadow:0 0 25px #ffb00055}.player-timer{position:absolute;right:10px;top:10px;padding:6px 9px;border-radius:8px;background:#080d16dd;border:1px solid #ffffff33;font-weight:1000;font-variant-numeric:tabular-nums}.player-timer.danger{color:#ff456a;border-color:#ff456a}.zoom-control{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin:-3px 0 12px;color:var(--muted);font-size:12px}.zoom-control input{margin:4px 0 0;padding:0}
+
+.vote-panel-big{border:2px solid var(--gold)!important;box-shadow:0 0 32px #ffb00033}
+.vote-hero,.tie-hero{font-size:26px;font-weight:1000;text-align:center;letter-spacing:.08em;color:var(--gold);margin-bottom:10px}
+.vote-choice-btn{font-size:18px!important;padding:18px 16px!important}
+#submitVote{font-size:18px!important;padding:16px!important}
+.tie-hero{font-size:32px}
 </style></head><body><div class="card">
 <h1>DER DÜMMSTE <i>FLIEGT</i></h1><p>Kamera verbinden und an Abstimmungen teilnehmen.</p>
 <div id="joinBox"><input id="room" placeholder="Raumcode"><input id="name" maxlength="30" placeholder="Dein Name"><button id="join" class="full">BEITRETEN</button></div>
@@ -24,9 +30,9 @@
 </div>
 <div class="volume"><label for="volume">🔊</label><input id="volume" type="range" min="0" max="100" value="65"><span id="volumeText">65%</span></div>
 <button id="testSound" class="full" type="button" style="margin-top:8px;background:#283147">🔊 SOUND TESTEN</button>
-<div id="votePanel" class="panel hidden"><h3>🗳️ VOTING</h3><div id="voteChoices" class="choices"></div><button id="submitVote" class="full">STIMME ABGEBEN</button><div id="voteStatus" class="status"></div></div>
+<div id="votePanel" class="panel vote-panel-big hidden"><div class="vote-hero">JETZT ABSTIMMEN</div><h3>🗳️ VOTING</h3><div id="voteChoices" class="choices"></div><button id="submitVote" class="full">STIMME ABGEBEN</button><div id="voteStatus" class="status"></div></div>
 <div id="estimatePanel" class="panel hidden"><h3>🔢 SCHÄTZFRAGE</h3><p>Gib deine Zahl ein. Sie wird erst vom Host aufgedeckt.</p><input id="estimateValue" inputmode="decimal" placeholder="Deine Zahl"><button id="submitEstimate" class="full">ZAHL ABGEBEN</button><div id="estimateStatus" class="status"></div></div>
-<div id="tiebreakPanel" class="panel hidden"><h3>⚡ STECHEN</h3><p>Gib deine Zahl ein. Die Zahlen werden erst vom Host aufgedeckt.</p><input id="tiebreakValue" inputmode="decimal" placeholder="Deine Zahl"><button id="submitTiebreak" class="full">ZAHL ABGEBEN</button><div id="tiebreakStatus" class="status"></div></div>
+<div id="tiebreakPanel" class="panel hidden"><div class="tie-hero">STECHEN</div><h3>⚡ ZAHL EINGEBEN</h3><p>Gib deine Zahl ein. Die Zahlen werden erst vom Host aufgedeckt.</p><input id="tiebreakValue" inputmode="decimal" placeholder="Deine Zahl"><button id="submitTiebreak" class="full">ZAHL ABGEBEN</button><div id="tiebreakStatus" class="status"></div></div>
 </div>
 <audio id="sndCorrect"></audio><audio id="sndWrong"></audio><audio id="sndSafe"></audio><audio id="sndEliminate"></audio>
 <script>
@@ -93,6 +99,7 @@ async function beep(kind){
       tone(ctx,220,t+.12,.22,.12,'triangle');
       tone(ctx,293.7,t+.24,.34,.11,'triangle');
     }else if(kind==='tick'){tone(ctx,880,t,.075,.10,'square');
+    }else if(kind==='timeup'){tone(ctx,440,t,.16,.18,'square');tone(ctx,330,t+.16,.22,.18,'square');tone(ctx,220,t+.38,.36,.2,'square');
     }else if(kind==='winner'){
       tone(ctx,196,t,.15,.12,'triangle');
       tone(ctx,247,t+.10,.18,.12,'triangle');
@@ -240,7 +247,7 @@ async function handle(m){
  if(m.type==='answer-status')renderMyAnswers(m.counts,m.history);
  if(m.type==='effect')beep(m.effect);
  if(m.type==='player-turn')$('myTurn').classList.toggle('hidden',!m.active);
- if(m.type==='timer-update'){const s=Math.max(0,Number(m.left)||0);$('playerTimer').textContent=`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;$('playerTimer').classList.toggle('danger',s<=5&&s>0);if(m.running&&s<=5&&s>0)beep('tick');}
+ if(m.type==='timer-update'){const s=Math.max(0,Number(m.left)||0);$('playerTimer').textContent=`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;$('playerTimer').classList.toggle('danger',s<=5&&s>0);if(m.running&&s<=5&&s>0)beep('tick');if(s===0&&!m.running)beep('timeup');}
  if(m.type==='estimate-start'){currentEstimateId=m.estimateId;$('estimatePanel').classList.remove('hidden');$('estimateValue').value='';$('submitEstimate').disabled=false;$('estimateStatus').textContent='';}
  if(m.type==='estimate-accepted'){$('submitEstimate').disabled=true;$('estimateStatus').textContent='Zahl gespeichert.';$('estimateStatus').className='status ok';}
  if(m.type==='estimate-ended')$('estimatePanel').classList.add('hidden');

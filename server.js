@@ -11,7 +11,7 @@ const rooms=new Map();
 
 app.use((req,res,next)=>{res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Headers','Content-Type');next();});
 app.use(express.static(path.join(__dirname,'public')));
-app.get('/health',(_,res)=>res.json({ok:true,version:'2.3.1-final-layout-fix'}));
+app.get('/health',(_,res)=>res.json({ok:true,version:'2.4.0-ui-gameflow-fix'}));
 app.get('/api/ice',(_,res)=>{
   // Bewusst schlanke ICE-Liste:
   // 1 stabiler STUN-Dienst für direkte P2P-Verbindungen
@@ -197,6 +197,14 @@ wss.on('connection',ws=>{
         const tb={id:crypto.randomUUID(),active:true,participants:ids,values:new Map()};room.tiebreak=tb;
         for(const id of ids)send(room.players.get(id).ws,{type:'tiebreak-start',tiebreakId:tb.id});
         send(ws,{type:'tiebreak-started',tiebreakId:tb.id,total:ids.length});return;
+      }
+      if(m.type==='end-tiebreak'){
+        if(room.tiebreak){room.tiebreak.active=false;for(const id of room.tiebreak.participants||[])send(room.players.get(id)?.ws,{type:'tiebreak-ended'});}
+        return;
+      }
+      if(m.type==='clear-estimate'){
+        if(room.estimate){room.estimate.active=false;for(const id of room.estimate.participants||[])send(room.players.get(id)?.ws,{type:'estimate-ended'});}
+        return;
       }
       if(m.type==='reveal-tiebreak'&&room.tiebreak?.active){
         room.tiebreak.active=false;const values=[];

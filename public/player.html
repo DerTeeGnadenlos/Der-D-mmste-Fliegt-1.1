@@ -93,14 +93,17 @@ async function peer(init){
  pc=new RTCPeerConnection({iceServers});
  pc.onicecandidate=e=>{if(e.candidate)send({type:'ice',candidate:e.candidate})};
  pc.onconnectionstatechange=()=>{
-   if(pc?.connectionState==='connected')$('status').textContent='Kamera live mit der Show verbunden.';
-   if(['failed','disconnected'].includes(pc?.connectionState))$('status').textContent='Kameraverbindung wird neu aufgebaut…';
+   const s=pc?.connectionState;
+   if(s==='connected')$('status').textContent='Kamera live mit der Show verbunden.';
+   else if(s==='connecting')$('status').textContent='Kamera verbunden – WebRTC verbindet…';
+   else if(['failed','disconnected'].includes(s))$('status').textContent='Kamera verbunden – WebRTC nicht verbunden.';
  };
  if(stream)stream.getTracks().forEach(t=>pc.addTrack(t,stream));
  if(init){
    const o=await pc.createOffer();
    await pc.setLocalDescription(o);
    send({type:'offer',sdp:pc.localDescription});
+   $('status').textContent='Kamera verbunden – WebRTC-Angebot gesendet…';
  }
 }
 async function media(){

@@ -11,7 +11,7 @@ const rooms=new Map();
 
 app.use((req,res,next)=>{res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Headers','Content-Type');next();});
 app.use(express.static(path.join(__dirname,'public')));
-app.get('/health',(_,res)=>res.json({ok:true,version:'2.0.13-metered-free-fix'}));
+app.get('/health',(_,res)=>res.json({ok:true,version:'2.0.14-exact-turn-udp-fix'}));
 app.get('/api/ice',(_,res)=>{
   const iceServers=[
     {urls:'stun:stun.relay.metered.ca:80'}
@@ -22,27 +22,21 @@ app.get('/api/ice',(_,res)=>{
     const credential=process.env.TURN_CREDENTIAL;
     const configured=String(process.env.TURN_URL||'').trim();
 
-    if(configured.includes('metered.ca')){
-      // WICHTIG: Den vom Nutzer konfigurierten Metered-Host respektieren.
-      // Free-Tarif: standard.relay.metered.ca
-      // Paid: z.B. global.relay.metered.ca / eu.relay...
-      let host='standard.relay.metered.ca';
-      try{
-        const cleaned=configured.replace(/^turns?:\/\//,'');
-        host=cleaned.split(':')[0].split('?')[0]||host;
-      }catch{}
+    if(configured){
+      // Den exakt getesteten TURN-Endpunkt unverändert zuerst verwenden.
+      iceServers.push({urls:configured,username,credential});
 
-      iceServers.push(
-        {urls:`turn:${host}:80`,username,credential},
-        {urls:`turn:${host}:80?transport=tcp`,username,credential},
-        {urls:`turn:${host}:443`,username,credential},
-        {urls:`turns:${host}:443?transport=tcp`,username,credential}
-      );
-    }else if(configured){
-      iceServers.push({
-        urls:configured.split(',').map(x=>x.trim()).filter(Boolean),
-        username,credential
-      });
+      // Falls Metered verwendet wird, zusätzliche Fallbacks ergänzen.
+      if(configured.includes('standard.relay.metered.ca')){
+        const fallbacks=[
+          'turn:standard.relay.metered.ca:80?transport=tcp',
+          'turn:standard.relay.metered.ca:443',
+          'turns:standard.relay.metered.ca:443?transport=tcp'
+        ];
+        for(const url of fallbacks){
+          if(url!==configured)iceServers.push({urls:url,username,credential});
+        }
+      }
     }
   }
 

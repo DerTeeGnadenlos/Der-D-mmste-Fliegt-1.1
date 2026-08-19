@@ -90,7 +90,7 @@ async function ice(){try{const r=await fetch('/api/ice'),j=await r.json();if(j.i
 function send(o){if(ws?.readyState===1)ws.send(JSON.stringify({...o,room}))}
 async function peer(init){
  if(pc)return;
- pc=new RTCPeerConnection({iceServers,iceTransportPolicy:forceRelay?'relay':'all',iceCandidatePoolSize:10});
+ pc=new RTCPeerConnection({iceServers,iceTransportPolicy:'all',iceCandidatePoolSize:10});
  pc.onicecandidate=e=>{if(e.candidate)send({type:'ice',candidate:e.candidate})};
  pc.onconnectionstatechange=()=>{
    const s=pc?.connectionState;

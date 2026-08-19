@@ -11,19 +11,19 @@ const rooms=new Map();
 
 app.use((req,res,next)=>{res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Headers','Content-Type');next();});
 app.use(express.static(path.join(__dirname,'public')));
-app.get('/health',(_,res)=>res.json({ok:true,version:'2.0.10-turn-windows-fix'}));
+app.get('/health',(_,res)=>res.json({ok:true,version:'2.0.12-multi-answer-dots'}));
 app.get('/api/ice',(_,res)=>{
-  const iceServers=[{urls:'stun:stun.relay.metered.ca:80'}];
-  let forceRelay=false;
+  const iceServers=[
+    {urls:'stun:stun.relay.metered.ca:80'}
+  ];
 
   if(process.env.TURN_USERNAME&&process.env.TURN_CREDENTIAL){
     const username=process.env.TURN_USERNAME;
     const credential=process.env.TURN_CREDENTIAL;
     const configured=String(process.env.TURN_URL||'').trim();
 
-    // Metered empfiehlt mehrere Transportwege gleichzeitig:
-    // UDP 80, TCP 80, UDP 443 und TLS/TCP 443.
     if(configured.includes('metered.ca')){
+      // Metered: UDP zuerst, danach TCP/TLS als Fallback.
       iceServers.push(
         {urls:'turn:global.relay.metered.ca:80',username,credential},
         {urls:'turn:global.relay.metered.ca:80?transport=tcp',username,credential},
@@ -36,13 +36,10 @@ app.get('/api/ice',(_,res)=>{
         username,credential
       });
     }
-
-    // Bei konfiguriertem TURN bevorzugen wir für dieses Spiel Relay,
-    // weil direkte Verbindungen im Test bereits fehlgeschlagen sind.
-    forceRelay=String(process.env.TURN_FORCE_RELAY||'true').toLowerCase()!=='false';
   }
 
-  res.json({iceServers,forceRelay});
+  // KEIN erzwungenes relay mehr. Browser darf direkte/STUN/TURN Wege vergleichen.
+  res.json({iceServers,forceRelay:false});
 });
 app.get('/join/:room',(_,res)=>res.sendFile(path.join(__dirname,'public','player.html')));
 

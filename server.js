@@ -11,7 +11,7 @@ const rooms=new Map();
 
 app.use((req,res,next)=>{res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Headers','Content-Type');next();});
 app.use(express.static(path.join(__dirname,'public')));
-app.get('/health',(_,res)=>res.json({ok:true,version:'2.0.16-signal-routing-fix'}));
+app.get('/health',(_,res)=>res.json({ok:true,version:'2.0.17-answer-ack-fix'}));
 app.get('/api/ice',(_,res)=>{
   const iceServers=[
     {urls:'stun:stun.relay.metered.ca:80'}
@@ -107,7 +107,15 @@ wss.on('connection',ws=>{
     }
 
     if(ws.role==='player'){
-      if(['offer','answer','ice'].includes(m.type)){send(room.host,{...m,playerId:ws.id});return;}
+      if(['offer','answer','ice'].includes(m.type)){
+        send(room.host,{...m,playerId:ws.id});
+        send(ws,{type:'signal-server-ack',signal:m.type,direction:'player-to-host'});
+        return;
+      }
+      if(m.type==='client-signal-status'){
+        send(room.host,{type:'client-signal-status',playerId:ws.id,stage:m.stage,message:m.message||''});
+        return;
+      }
       if(m.type==='submit-vote'&&room.vote?.active&&m.voteId===room.vote.id){
         const voter=room.players.get(ws.id);if(!voter||voter.lives<=0)return;
         const valid=room.vote.candidates.some(c=>c.id===m.targetId);if(!valid)return;
@@ -128,7 +136,11 @@ wss.on('connection',ws=>{
 
     if(ws.role==='host'){
       if(['offer','answer','ice'].includes(m.type)){
-        const p=room.players.get(m.playerId);if(p)send(p.ws,{...m,from:'host'});return;
+        const p=room.players.get(m.playerId);
+        const delivered=!!(p&&p.ws&&p.ws.readyState===WebSocket.OPEN);
+        if(delivered)send(p.ws,{...m,from:'host'});
+        send(ws,{type:'signal-delivery-ack',signal:m.type,playerId:m.playerId,delivered});
+        return;
       }
       if(m.type==='state'){
         const p=room.players.get(m.playerId);if(!p)return;

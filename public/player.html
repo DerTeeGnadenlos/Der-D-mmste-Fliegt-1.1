@@ -171,10 +171,16 @@ async function handle(m){
  send({type:'answer',sdp:pc.localDescription});
 }
  if(m.type==='answer'&&pc){
-   await pc.setRemoteDescription(m.sdp);
+   send({type:'client-signal-status',stage:'answer-received'});
+   try{
+     await pc.setRemoteDescription(m.sdp);
+     send({type:'client-signal-status',stage:'answer-applied'});
+   }catch(e){
+     send({type:'client-signal-status',stage:'answer-error',message:String(e?.message||e)});
+     $('status').textContent='WebRTC-Answer konnte nicht verarbeitet werden.';
+     return;
+   }
 
-   // WICHTIG: Host-ICE kann bereits vor der Answer angekommen sein.
-   // Diese Kandidaten wurden gepuffert und müssen JETZT eingespielt werden.
    const queued=[...pendingIce];
    pendingIce=[];
    for(const c of queued){
@@ -192,6 +198,12 @@ async function handle(m){
  }
  if(m.type==='state'){$('myName').textContent=m.name;$('lives').textContent=m.lives;$('safe').textContent=m.safe?'SAFE':''}
  if(m.type==='effect')beep(m.effect);
+ if(m.type==='signal-server-ack'){
+   if(m.signal==='offer')$('status').textContent='WebRTC-Angebot beim Server angekommen…';
+ }
+ if(m.type==='signal-delivery-ack'){
+   // Spieler sollte diese Meldung normalerweise nicht bekommen.
+ }
  if(m.type==='vote-start'){
    currentVoteId=m.voteId;
    selectedVoteTarget=null;

@@ -11,7 +11,7 @@ const rooms=new Map();
 
 app.use((req,res,next)=>{res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Headers','Content-Type');next();});
 app.use(express.static(path.join(__dirname,'public')));
-app.get('/health',(_,res)=>res.json({ok:true,version:'2.2.0-show-design'}));
+app.get('/health',(_,res)=>res.json({ok:true,version:'2.3.1-final-layout-fix'}));
 app.get('/api/ice',(_,res)=>{
   // Bewusst schlanke ICE-Liste:
   // 1 stabiler STUN-Dienst für direkte P2P-Verbindungen
@@ -107,6 +107,11 @@ wss.on('connection',ws=>{
         send(room.host,{type:'client-signal-status',playerId:ws.id,stage:m.stage,message:m.message||''});
         return;
       }
+      if(m.type==='submit-estimate'&&room.estimate?.active&&m.estimateId===room.estimate.id&&room.estimate.participants.includes(ws.id)){
+        const value=String(m.value??'').trim().slice(0,30);if(!value)return;
+        room.estimate.values.set(ws.id,value);send(ws,{type:'estimate-accepted'});
+        send(room.host,{type:'estimate-progress',submitted:room.estimate.values.size,total:room.estimate.participants.length});return;
+      }
       if(m.type==='submit-vote'&&room.vote?.active&&m.voteId===room.vote.id){
         const voter=room.players.get(ws.id);if(!voter||voter.lives<=0)return;
         const valid=room.vote.candidates.some(c=>c.id===m.targetId);if(!valid)return;
@@ -146,12 +151,26 @@ wss.on('connection',ws=>{
           right:Math.max(0,Number(m.counts?.right)||0),
           wrong:Math.max(0,Number(m.counts?.wrong)||0)
         };
-        send(p.ws,{type:'answer-status',counts});
+        send(p.ws,{type:'answer-status',counts,history:Array.isArray(m.history)?m.history:[]});
         return;
       }
       if(m.type==='reset-answer-status'){
         broadcastPlayers(room,{type:'answer-status',counts:{right:0,wrong:0}});
         return;
+      }
+      if(m.type==='player-turn'){const p=room.players.get(m.playerId);if(p)send(p.ws,{type:'player-turn',active:!!m.active});return;}
+      if(m.type==='timer-update'){broadcastPlayers(room,{type:'timer-update',left:Number(m.left)||0,initial:Number(m.initial)||0,running:!!m.running});return;}
+      if(m.type==='start-estimate'){
+        const ids=(m.playerIds||[]).filter(id=>room.players.has(id)&&room.players.get(id).lives>0);
+        const er={id:crypto.randomUUID(),active:true,participants:ids,values:new Map()};room.estimate=er;
+        for(const id of ids)send(room.players.get(id).ws,{type:'estimate-start',estimateId:er.id});
+        send(ws,{type:'estimate-started',estimateId:er.id,total:ids.length});return;
+      }
+      if(m.type==='reveal-estimate'&&room.estimate?.active){
+        room.estimate.active=false;const values=[];
+        for(const id of room.estimate.participants)values.push({playerId:id,value:room.estimate.values.get(id)??'—'});
+        for(const id of room.estimate.participants)send(room.players.get(id).ws,{type:'estimate-ended'});
+        send(ws,{type:'estimate-result',values});return;
       }
       if(m.type==='kick'){
         const p=room.players.get(m.playerId);if(p){send(p.ws,{type:'kicked'});p.ws?.close();room.players.delete(p.id);send(ws,{type:'player-removed',playerId:p.id});}return;

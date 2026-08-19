@@ -11,7 +11,7 @@ const rooms=new Map();
 
 app.use((req,res,next)=>{res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Headers','Content-Type');next();});
 app.use(express.static(path.join(__dirname,'public')));
-app.get('/health',(_,res)=>res.json({ok:true,version:'2.0.18-plain-sdp-fix'}));
+app.get('/health',(_,res)=>res.json({ok:true,version:'2.1.0-stable'}));
 app.get('/api/ice',(_,res)=>{
   const iceServers=[
     {urls:'stun:stun.relay.metered.ca:80'}
@@ -148,6 +148,19 @@ wss.on('connection',ws=>{
         if(Number.isFinite(m.lives))p.lives=Math.max(0,Math.min(99,m.lives));
         if(typeof m.safe==='boolean')p.safe=m.safe;
         send(p.ws,{type:'state',name:p.name,lives:p.lives,safe:p.safe});return;
+      }
+      if(m.type==='player-answer'){
+        const p=room.players.get(m.playerId);if(!p)return;
+        const counts={
+          right:Math.max(0,Number(m.counts?.right)||0),
+          wrong:Math.max(0,Number(m.counts?.wrong)||0)
+        };
+        send(p.ws,{type:'answer-status',counts});
+        return;
+      }
+      if(m.type==='reset-answer-status'){
+        broadcastPlayers(room,{type:'answer-status',counts:{right:0,wrong:0}});
+        return;
       }
       if(m.type==='kick'){
         const p=room.players.get(m.playerId);if(p){send(p.ws,{type:'kicked'});p.ws?.close();room.players.delete(p.id);send(ws,{type:'player-removed',playerId:p.id});}return;

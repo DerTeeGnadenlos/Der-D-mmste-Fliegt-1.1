@@ -5,10 +5,20 @@
 .vote-choice-btn.selected{border-color:var(--gold);background:#3a2a0d;box-shadow:0 0 0 2px #ffb00033}
 .vote-choice-btn .self{font-size:11px;color:var(--gold);border:1px solid var(--gold);border-radius:99px;padding:3px 7px}
 #submitVote:disabled{opacity:.45;cursor:not-allowed}.hidden{display:none!important}.status{font-size:13px;color:var(--muted)}.ok{color:var(--green)}.volume{display:grid;grid-template-columns:auto 1fr 42px;gap:8px;align-items:center;margin-top:10px}.volume input{margin:0}.vote-result{font-weight:900;color:var(--gold);margin-top:8px}
+.my-answer-panel{margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:10px;background:#090e18}
+.my-answer-label{font-size:11px;font-weight:900;color:var(--muted);letter-spacing:.08em}
+.my-answer-dots{display:flex;gap:7px;flex-wrap:wrap;align-items:center;min-height:25px;margin-top:7px}
+.my-answer-dot{width:16px;height:16px;border-radius:50%;border:2px solid white;display:inline-block}
+.my-answer-dot.right{background:var(--green)}
+.my-answer-dot.wrong{background:var(--red)}
+.no-answers{font-size:12px;color:var(--muted)}
 </style></head><body><div class="card">
 <h1>DER DÜMMSTE <i>FLIEGT</i></h1><p>Kamera verbinden und an Abstimmungen teilnehmen.</p>
 <div id="joinBox"><input id="room" placeholder="Raumcode"><input id="name" maxlength="30" placeholder="Dein Name"><button id="join" class="full">BEITRETEN</button></div>
-<div id="game" class="hidden"><div id="status" class="status">Verbunden…</div><video id="preview" autoplay muted playsinline></video><div class="stats"><span id="myName"></span><span>❤️ <b id="lives">3</b></span><span id="safe" class="safe"></span></div>
+<div id="game" class="hidden"><div id="status" class="status">Verbunden…</div><video id="preview" autoplay muted playsinline></video><div class="stats"><span id="myName"></span><span>❤️ <b id="lives">3</b></span><span id="safe" class="safe"></span></div><div class="my-answer-panel">
+<div class="my-answer-label">DEINE ANTWORTEN</div>
+<div id="myAnswerDots" class="my-answer-dots"><span class="no-answers">Noch keine Antwort markiert.</span></div>
+</div>
 <div class="volume"><label for="volume">🔊</label><input id="volume" type="range" min="0" max="100" value="65"><span id="volumeText">65%</span></div>
 <button id="testSound" class="full" type="button" style="margin-top:8px;background:#283147">🔊 SOUND TESTEN</button>
 <div id="votePanel" class="panel hidden"><h3>🗳️ VOTING</h3><div id="voteChoices" class="choices"></div><button id="submitVote" class="full">STIMME ABGEBEN</button><div id="voteStatus" class="status"></div></div>
@@ -85,6 +95,17 @@ async function beep(kind){
   }catch(e){
     console.warn('Sound konnte nicht abgespielt werden',e);
   }
+}
+function renderMyAnswers(counts){
+ const box=$('myAnswerDots');if(!box)return;
+ const right=Math.max(0,Number(counts?.right)||0);
+ const wrong=Math.max(0,Number(counts?.wrong)||0);
+ box.innerHTML='';
+ if(!right&&!wrong){
+   const s=document.createElement('span');s.className='no-answers';s.textContent='Noch keine Antwort markiert.';box.appendChild(s);return;
+ }
+ for(let i=0;i<right;i++){const d=document.createElement('span');d.className='my-answer-dot right';box.appendChild(d);}
+ for(let i=0;i<wrong;i++){const d=document.createElement('span');d.className='my-answer-dot wrong';box.appendChild(d);}
 }
 async function ice(){try{const r=await fetch('/api/ice'),j=await r.json();if(j.iceServers)iceServers=j.iceServers;forceRelay=!!j.forceRelay}catch{}}
 function send(o){if(ws?.readyState===1)ws.send(JSON.stringify({...o,room}))}
@@ -212,6 +233,7 @@ async function handle(m){
    }
  }
  if(m.type==='state'){$('myName').textContent=m.name;$('lives').textContent=m.lives;$('safe').textContent=m.safe?'SAFE':''}
+ if(m.type==='answer-status')renderMyAnswers(m.counts);
  if(m.type==='effect')beep(m.effect);
  if(m.type==='signal-server-ack'){
    if(m.signal==='offer')$('status').textContent='WebRTC-Angebot beim Server angekommen…';

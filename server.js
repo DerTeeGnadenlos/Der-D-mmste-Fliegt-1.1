@@ -11,7 +11,7 @@ const rooms=new Map();
 
 app.use((req,res,next)=>{res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Headers','Content-Type');next();});
 app.use(express.static(path.join(__dirname,'public')));
-app.get('/health',(_,res)=>res.json({ok:true,version:'2.4.0-ui-gameflow-fix'}));
+app.get('/health',(_,res)=>res.json({ok:true,version:'2.6.0-clean-final-stable'}));
 app.get('/api/ice',(_,res)=>{
   // Bewusst schlanke ICE-Liste:
   // 1 stabiler STUN-Dienst für direkte P2P-Verbindungen

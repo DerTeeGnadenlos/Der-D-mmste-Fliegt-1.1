@@ -1,6 +1,10 @@
 <!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Der Dümmste fliegt – Spieler</title>
 <style>
-:root{--bg:#070910;--panel:#111624;--line:#2c3447;--text:#f7f8fc;--muted:#9ba5b9;--gold:#ffb000;--green:#2bdc8a;--red:#ff456a;--purple:#8c2de2}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at top,#28113c,#070910 55%);font-family:Segoe UI,Arial,sans-serif;color:var(--text);display:grid;place-items:center;padding:20px}.card{width:min(94vw,560px);background:#0d121ee8;border:1px solid var(--line);border-radius:18px;padding:24px}h1{margin:0;font-size:29px;letter-spacing:.06em}h1 i{color:var(--gold)}p{color:var(--muted)}input,select,button{font:inherit;border-radius:9px}input,select{width:100%;background:#090d16;border:1px solid var(--line);color:white;padding:11px;margin:6px 0}button{border:0;background:#6320aa;color:white;padding:11px 13px;font-weight:900;cursor:pointer}.full{width:100%}video{width:100%;aspect-ratio:16/9;object-fit:cover;background:#030408;border-radius:12px;margin:12px 0}.stats{display:flex;justify-content:space-between;gap:10px;background:#0a0e18;border:1px solid var(--line);border-radius:10px;padding:11px;font-weight:900}.safe{color:var(--green)}.panel{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#0a0f19}.panel h3{margin:0 0 8px;color:var(--gold);font-size:13px}.choices{display:grid;gap:6px}.choice{display:flex;align-items:center;gap:8px;padding:9px;border:1px solid var(--line);border-radius:8px}.choice input{width:auto;margin:0}.hidden{display:none!important}.status{font-size:13px;color:var(--muted)}.ok{color:var(--green)}.volume{display:grid;grid-template-columns:auto 1fr 42px;gap:8px;align-items:center;margin-top:10px}.volume input{margin:0}.vote-result{font-weight:900;color:var(--gold);margin-top:8px}
+:root{--bg:#070910;--panel:#111624;--line:#2c3447;--text:#f7f8fc;--muted:#9ba5b9;--gold:#ffb000;--green:#2bdc8a;--red:#ff456a;--purple:#8c2de2}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at top,#28113c,#070910 55%);font-family:Segoe UI,Arial,sans-serif;color:var(--text);display:grid;place-items:center;padding:20px}.card{width:min(94vw,560px);background:#0d121ee8;border:1px solid var(--line);border-radius:18px;padding:24px}h1{margin:0;font-size:29px;letter-spacing:.06em}h1 i{color:var(--gold)}p{color:var(--muted)}input,select,button{font:inherit;border-radius:9px}input,select{width:100%;background:#090d16;border:1px solid var(--line);color:white;padding:11px;margin:6px 0}button{border:0;background:#6320aa;color:white;padding:11px 13px;font-weight:900;cursor:pointer}.full{width:100%}video{width:100%;aspect-ratio:16/9;object-fit:cover;background:#030408;border-radius:12px;margin:12px 0}.stats{display:flex;justify-content:space-between;gap:10px;background:#0a0e18;border:1px solid var(--line);border-radius:10px;padding:11px;font-weight:900}.safe{color:var(--green)}.panel{margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#0a0f19}.panel h3{margin:0 0 8px;color:var(--gold);font-size:13px}.choices{display:grid;gap:6px}.choice{display:flex;align-items:center;gap:8px;padding:9px;border:1px solid var(--line);border-radius:8px}.choice input{width:auto;margin:0}
+.vote-choice-btn{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;margin:7px 0;padding:14px 15px;border:2px solid var(--line);border-radius:12px;background:#111827;color:var(--text);font-weight:900;text-align:left}
+.vote-choice-btn.selected{border-color:var(--gold);background:#3a2a0d;box-shadow:0 0 0 2px #ffb00033}
+.vote-choice-btn .self{font-size:11px;color:var(--gold);border:1px solid var(--gold);border-radius:99px;padding:3px 7px}
+#submitVote:disabled{opacity:.45;cursor:not-allowed}.hidden{display:none!important}.status{font-size:13px;color:var(--muted)}.ok{color:var(--green)}.volume{display:grid;grid-template-columns:auto 1fr 42px;gap:8px;align-items:center;margin-top:10px}.volume input{margin:0}.vote-result{font-weight:900;color:var(--gold);margin-top:8px}
 </style></head><body><div class="card">
 <h1>DER DÜMMSTE <i>FLIEGT</i></h1><p>Kamera verbinden und an Abstimmungen teilnehmen.</p>
 <div id="joinBox"><input id="room" placeholder="Raumcode"><input id="name" maxlength="30" placeholder="Dein Name"><button id="join" class="full">BEITRETEN</button></div>
@@ -12,7 +16,7 @@
 </div>
 <audio id="sndCorrect"></audio><audio id="sndWrong"></audio><audio id="sndSafe"></audio><audio id="sndEliminate"></audio>
 <script>
-let ws,room,pc,stream,mediaPromise=null,playerId,currentVoteId,currentTiebreakId,iceServers=[{urls:'stun:stun.l.google.com:19302'}];let pendingIce=[];
+let ws,room,pc,stream,mediaPromise=null,playerId,currentVoteId,currentTiebreakId,selectedVoteTarget=null,iceServers=[{urls:'stun:stun.l.google.com:19302'}];let pendingIce=[];
 const $=id=>document.getElementById(id);const parts=location.pathname.split('/').filter(Boolean);if(parts[0]==='join'&&parts[1])$('room').value=parts[1].toUpperCase();
 let volume=Number(localStorage.getItem('ddf_volume')||65)/100;
 $('volume').value=Math.round(volume*100);
@@ -88,6 +92,10 @@ async function peer(init){
  if(pc)return;
  pc=new RTCPeerConnection({iceServers});
  pc.onicecandidate=e=>{if(e.candidate)send({type:'ice',candidate:e.candidate})};
+ pc.onconnectionstatechange=()=>{
+   if(pc?.connectionState==='connected')$('status').textContent='Kamera live mit der Show verbunden.';
+   if(['failed','disconnected'].includes(pc?.connectionState))$('status').textContent='Kameraverbindung wird neu aufgebaut…';
+ };
  if(stream)stream.getTracks().forEach(t=>pc.addTrack(t,stream));
  if(init){
    const o=await pc.createOffer();
@@ -125,8 +133,10 @@ async function handle(m){
  $('lives').textContent=m.player.lives;
  $('safe').textContent=m.player.safe?'SAFE':'';
  pc?.close();pc=null;pendingIce=[];
- // Kamera schon hier anfordern. Falls gleichzeitig ein Offer kommt, wartet dessen Handler auf dieselbe mediaPromise.
- await media();
+ // Kamera öffnen und danach selbst das WebRTC-Offer erzeugen.
+ // Damit gibt es nur noch eine eindeutige Verbindungsrichtung: Spieler -> Showfenster.
+ const local=await media();
+ if(local)await peer(true);
 }
  if(m.type==='offer'){
  // Wichtig: Vor der Answer muss der lokale Videotrack vorhanden sein.
@@ -150,13 +160,52 @@ async function handle(m){
  }
  if(m.type==='state'){$('myName').textContent=m.name;$('lives').textContent=m.lives;$('safe').textContent=m.safe?'SAFE':''}
  if(m.type==='effect')beep(m.effect);
- if(m.type==='vote-start'){currentVoteId=m.voteId;$('votePanel').classList.remove('hidden');$('voteStatus').textContent='';$('submitVote').disabled=false;const box=$('voteChoices');box.innerHTML='';m.candidates.forEach(c=>{const l=document.createElement('label');l.className='choice';l.innerHTML=`<input type="radio" name="vote" value="${c.id}"><span>${c.name}${c.id===playerId?' (DU)':''}</span>`;box.appendChild(l)})}
- if(m.type==='vote-accepted'){$('voteStatus').textContent='Stimme gespeichert. Jetzt heißt es warten…';$('voteStatus').className='status ok';$('submitVote').disabled=true}
- if(m.type==='vote-ended'){$('votePanel').classList.add('hidden')}
+ if(m.type==='vote-start'){
+   currentVoteId=m.voteId;
+   selectedVoteTarget=null;
+   $('votePanel').classList.remove('hidden');
+   $('voteStatus').textContent=m.candidates?.length?'Tippe auf einen Spieler. Du darfst auch dich selbst wählen.':'Aktuell ist niemand wählbar.';
+   $('voteStatus').className='status';
+   $('submitVote').disabled=true;
+   const box=$('voteChoices');
+   box.innerHTML='';
+   (m.candidates||[]).forEach(c=>{
+     const b=document.createElement('button');
+     b.type='button';
+     b.className='vote-choice-btn';
+     b.dataset.voteId=c.id;
+     const name=document.createElement('span');
+     name.textContent=c.name;
+     b.appendChild(name);
+     if(c.id===playerId){
+       const self=document.createElement('span');
+       self.className='self';
+       self.textContent='DU 😄';
+       b.appendChild(self);
+     }
+     b.addEventListener('click',()=>{
+       selectedVoteTarget=c.id;
+       box.querySelectorAll('.vote-choice-btn').forEach(x=>x.classList.toggle('selected',x.dataset.voteId===c.id));
+       $('submitVote').disabled=false;
+       $('voteStatus').textContent=`Ausgewählt: ${c.name}`;
+     });
+     box.appendChild(b);
+   });
+ }
+ if(m.type==='vote-accepted'){
+ $('voteStatus').textContent='Stimme gespeichert. Jetzt heißt es warten…';
+ $('voteStatus').className='status ok';
+ $('submitVote').disabled=true;
+ $('voteChoices').querySelectorAll('.vote-choice-btn').forEach(b=>b.disabled=true);
+}
+ if(m.type==='vote-ended'){selectedVoteTarget=null;$('votePanel').classList.add('hidden')}
  if(m.type==='tiebreak-start'){currentTiebreakId=m.tiebreakId;$('tiebreakPanel').classList.remove('hidden');$('tiebreakValue').value='';$('submitTiebreak').disabled=false;$('tiebreakStatus').textContent=''}
  if(m.type==='tiebreak-accepted'){$('submitTiebreak').disabled=true;$('tiebreakStatus').textContent='Zahl gespeichert.';$('tiebreakStatus').className='status ok'}
  if(m.type==='tiebreak-ended')$('tiebreakPanel').classList.add('hidden');
  if(m.type==='kicked'){alert('Du wurdest aus der Session entfernt.');location.reload()}if(m.type==='host-left')$('status').textContent='Host hat die Session beendet.';
 }
-$('join').addEventListener('click',join);$('testSound').addEventListener('click',async()=>{await unlockAudio();beep('correct')});$('submitVote').addEventListener('click',()=>{const r=document.querySelector('input[name="vote"]:checked');if(!r)return alert('Bitte einen Spieler auswählen.');send({type:'submit-vote',voteId:currentVoteId,targetId:r.value})});$('submitTiebreak').addEventListener('click',()=>{const v=$('tiebreakValue').value.trim();if(!v)return alert('Bitte eine Zahl eingeben.');send({type:'submit-tiebreak',tiebreakId:currentTiebreakId,value:v})});
+$('join').addEventListener('click',join);$('testSound').addEventListener('click',async()=>{await unlockAudio();beep('correct')});$('submitVote').addEventListener('click',()=>{
+ if(!selectedVoteTarget)return alert('Bitte zuerst einen Spieler antippen.');
+ send({type:'submit-vote',voteId:currentVoteId,targetId:selectedVoteTarget});
+});$('submitTiebreak').addEventListener('click',()=>{const v=$('tiebreakValue').value.trim();if(!v)return alert('Bitte eine Zahl eingeben.');send({type:'submit-tiebreak',tiebreakId:currentTiebreakId,value:v})});
 </script></div></body></html>

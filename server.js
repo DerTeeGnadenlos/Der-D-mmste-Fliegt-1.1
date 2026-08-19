@@ -29,7 +29,7 @@ app.post('/api/media',(req,res)=>{
     res.json({ok:true,url:'/media/'+id,size:buf.length});
   }catch(e){res.status(500).json({ok:false,error:e.message})}
 });
-app.get('/health',(_,res)=>res.json({ok:true,version:'3.0.0-gameshow-platform'}));
+app.get('/health',(_,res)=>res.json({ok:true,version:'3.1.0-big-stability-ui-patch'}));
 app.get('/api/ice',(_,res)=>{
   // Bewusst schlanke ICE-Liste:
   // 1 stabiler STUN-Dienst für direkte P2P-Verbindungen
@@ -110,11 +110,14 @@ wss.on('connection',ws=>{
         send(ws,{type:'joined',room:code,player:publicPlayer(player),reconnected:false});
         send(room.host,{type:'player-joined',player:publicPlayer(player)});
       }
-      if(room.vote?.active){send(ws,{type:'vote-start',voteId:room.vote.id,candidates:room.vote.candidates});}
-      if(room.tiebreak?.active&&room.tiebreak.participants.includes(ws.id)){send(ws,{type:'tiebreak-start',tiebreakId:room.tiebreak.id});}
-      if(room.buzzer?.active&&room.buzzer.participants.includes(ws.id)){send(ws,{type:'buzzer-start'});}
+      send(ws,{type:'ready-state',ready:!!player.ready});send(ws,{type:'scene',scene:room.scene||'main'});
+      if(room.vote?.active){send(ws,{type:'vote-start',voteId:room.vote.id,candidates:room.vote.candidates});if(room.vote.votes.has(ws.id))send(ws,{type:'vote-accepted',targetId:room.vote.votes.get(ws.id)});}
+      if(room.tiebreak?.active&&room.tiebreak.participants.includes(ws.id)){send(ws,{type:'tiebreak-start',tiebreakId:room.tiebreak.id});if(room.tiebreak.values.has(ws.id))send(ws,{type:'tiebreak-accepted'});}
+      if(room.estimate?.active&&room.estimate.participants.includes(ws.id)){send(ws,{type:'estimate-start',estimateId:room.estimate.id});if(room.estimate.values.has(ws.id))send(ws,{type:'estimate-accepted'});}
+      if(room.buzzer?.active&&room.buzzer.participants.includes(ws.id)){send(ws,{type:'buzzer-start'});if(room.buzzer.winnerId){const bp=room.players.get(room.buzzer.winnerId);send(ws,{type:'buzzer-result',playerId:room.buzzer.winnerId,name:bp?.name||'Spieler',color:bp?.color||'#4e7cff'});}}
       if(room.imageQuestion?.active&&room.imageQuestion.participants.includes(ws.id)){
         send(ws,{type:'image-question-start',id:room.imageQuestion.id,mode:room.imageQuestion.mode,url:room.imageQuestion.url,question:room.imageQuestion.question,color:player.color});
+        if(room.imageQuestion.answers.has(ws.id))send(ws,{type:'image-answer-accepted'});if(room.imageQuestion.locked)send(ws,{type:'image-question-locked'});
       }
       return;
     }
@@ -255,8 +258,11 @@ wss.on('connection',ws=>{
           for(const v of values){if(!v.answer)continue;v.distance=Math.hypot(v.answer.x-q.target.x,v.answer.y-q.target.y);}
           const valid=values.filter(v=>Number.isFinite(v.distance)).sort((a,b)=>a.distance-b.distance);
           nearest=valid[0]?.playerId||null;farthest=valid.at(-1)?.playerId||null;
+          const eps=.002,min=valid[0]?.distance,max=valid.at(-1)?.distance;
+          q.nearestIds=Number.isFinite(min)?valid.filter(v=>Math.abs(v.distance-min)<=eps).map(v=>v.playerId):[];
+          q.farthestIds=Number.isFinite(max)?valid.filter(v=>Math.abs(v.distance-max)<=eps).map(v=>v.playerId):[];
         }
-        send(ws,{type:'image-question-result',id:q.id,mode:q.mode,url:q.url,question:q.question,target:q.target,values,nearest,farthest});return;
+        send(ws,{type:'image-question-result',id:q.id,mode:q.mode,url:q.url,question:q.question,target:q.target,values,nearest,farthest,nearestIds:q.nearestIds||[],farthestIds:q.farthestIds||[]});return;
       }
       if(m.type==='end-image-question'){
         if(room.imageQuestion)room.imageQuestion.active=false;broadcastPlayers(room,{type:'image-question-end'});return;

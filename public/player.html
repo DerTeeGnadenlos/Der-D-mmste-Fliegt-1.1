@@ -264,13 +264,13 @@ async function handle(m){
  if(m.type==='image-question-start'){
    currentImageId=m.id;currentImageMode=m.mode;imageLocked=false;
    $('imageQuestionPanel').classList.remove('hidden');$('imageQuestionPanel').classList.remove('locked');
-   $('imageQuestionTitle').textContent=m.question||'BILDFRAGE';$('playerQuestionImage').src=m.url;
-   $('myImagePin').classList.add('hidden');$('imageTextArea').classList.toggle('hidden',m.mode!=='text');
+   $('imageQuestionTitle').textContent=m.question||'BILDFRAGE';$('playerImageWrap').classList.toggle('hidden',!m.url);$('playerQuestionImage').src=m.url||'';
+   $('myImagePin').classList.add('hidden');$('imageTextArea').classList.toggle('hidden',m.mode!=='text');$('submitImageText').disabled=false;$('imageTextAnswer').value='';
    $('imageQuestionStatus').textContent=m.mode==='pin'?'Tippe auf die richtige Stelle.':'Tippe deine Antwort ein.';
-   $('playerQuestionImage').onload=()=>send({type:'image-ready',id:m.id});
+   if(m.url)$('playerQuestionImage').onload=()=>send({type:'image-ready',id:m.id});else send({type:'image-ready',id:m.id});
  }
  if(m.type==='image-question-locked'){imageLocked=true;$('imageQuestionPanel').classList.add('locked');$('imageQuestionStatus').textContent='Eingaben gesperrt.';}
- if(m.type==='image-answer-accepted')$('imageQuestionStatus').textContent='Antwort gespeichert ✓';
+ if(m.type==='image-answer-accepted'){$('imageQuestionStatus').textContent='Antwort gespeichert ✓';if(currentImageMode==='text')$('submitImageText').disabled=true;}
  if(m.type==='image-question-end')$('imageQuestionPanel').classList.add('hidden');
  if(m.type==='estimate-start'){currentEstimateId=m.estimateId;$('estimatePanel').classList.remove('hidden');$('estimateValue').value='';$('submitEstimate').disabled=false;$('estimateStatus').textContent='';}
  if(m.type==='estimate-accepted'){$('submitEstimate').disabled=true;$('estimateStatus').textContent='Zahl gespeichert.';$('estimateStatus').className='status ok';}

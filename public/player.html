@@ -1,0 +1,46 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Der Dümmste fliegt – Beitreten</title>
+<style>
+:root{--bg:#070910;--panel:#121725;--line:#2c3447;--text:#f8f9fd;--muted:#9ba5b9;--gold:#ffb000;--purple:#7817c9;--green:#2bdc8a}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at top,#28123d,#070910 55%);font-family:Segoe UI,Arial,sans-serif;color:var(--text)}
+.card{width:min(92vw,520px);background:rgba(15,19,30,.96);border:1px solid var(--line);border-radius:18px;padding:26px;box-shadow:0 20px 70px #0008}
+h1{margin:0 0 4px;font-size:30px;letter-spacing:.06em}h1 span{color:var(--gold);font-style:italic}.sub{color:var(--muted);margin:0 0 22px}
+input,button{width:100%;padding:12px;border-radius:9px;font:inherit}input{background:#090d16;color:white;border:1px solid var(--line);margin:7px 0}button{border:0;background:linear-gradient(135deg,#5910a5,#8d1be3);color:white;font-weight:900;cursor:pointer;margin-top:8px}
+video{width:100%;aspect-ratio:16/9;object-fit:cover;background:#030408;border-radius:12px;margin:15px 0}.stats{display:flex;justify-content:space-between;background:#0b0f19;border:1px solid var(--line);border-radius:10px;padding:12px;font-weight:800}.safe{color:var(--green)}.status{color:var(--muted);font-size:13px}
+</style></head><body>
+<div class="card"><h1>DER DÜMMSTE <span>FLIEGT</span></h1><p class="sub">Kamera für die Spielshow verbinden</p>
+<div id="joinBox"><input id="room" placeholder="Raumcode"><input id="name" maxlength="30" placeholder="Dein Name"><button id="join">BEITRETEN</button></div>
+<div id="game" hidden><div id="status" class="status">Verbunden …</div><video id="preview" autoplay muted playsinline></video><div class="stats"><span id="myName"></span><span>❤️ <b id="lives">3</b></span><span id="safe" class="safe"></span></div></div>
+</div>
+<script>
+let ws,room,pc,stream,iceServers=[{urls:"stun:stun.l.google.com:19302"}];
+const $=x=>document.getElementById(x),parts=location.pathname.split("/").filter(Boolean);
+if(parts[0]==="join"&&parts[1])$("room").value=parts[1].toUpperCase();
+async function getIce(){try{const r=await fetch("/api/ice"),j=await r.json();if(j.iceServers)iceServers=j.iceServers}catch{}}
+function send(o){if(ws?.readyState===1)ws.send(JSON.stringify({...o,room}))}
+async function createPeer(initiator){
+ if(pc)return;pc=new RTCPeerConnection({iceServers});
+ pc.onicecandidate=e=>{if(e.candidate)send({type:"ice",candidate:e.candidate})};
+ if(stream)stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+ if(initiator){const o=await pc.createOffer();await pc.setLocalDescription(o);send({type:"offer",sdp:pc.localDescription})}
+}
+async function join(){
+ room=$("room").value.trim().toUpperCase();const name=$("name").value.trim()||"Spieler";if(!room)return alert("Raumcode eingeben.");
+ await getIce();ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host);
+ ws.onopen=()=>send({type:"join-room",name});
+ ws.onmessage=async e=>{const m=JSON.parse(e.data);
+  if(m.type==="error"){alert(m.message);return}
+  if(m.type==="joined"){
+   $("joinBox").hidden=true;$("game").hidden=false;$("myName").textContent=m.player.name;
+   try{stream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720}},audio:false});$("preview").srcObject=stream;$("status").textContent="Kamera verbunden.";await createPeer(true)}
+   catch{$("status").textContent="Kamera nicht freigegeben."}
+  }
+  if(m.type==="offer"){await createPeer(false);await pc.setRemoteDescription(m.sdp);const a=await pc.createAnswer();await pc.setLocalDescription(a);send({type:"answer",sdp:pc.localDescription})}
+  if(m.type==="answer"&&pc)await pc.setRemoteDescription(m.sdp);
+  if(m.type==="ice"&&pc&&m.candidate)try{await pc.addIceCandidate(m.candidate)}catch{}
+  if(m.type==="state"){$("myName").textContent=m.name;$("lives").textContent=m.lives;$("safe").textContent=m.safe?"SAFE":""}
+  if(m.type==="kicked"){alert("Du wurdest entfernt.");location.reload()}
+  if(m.type==="host-left")$("status").textContent="Der Host hat die Runde beendet.";
+ };
+}
+$("join").onclick=join;
+</script></body></html>

@@ -11,32 +11,23 @@ const rooms=new Map();
 
 app.use((req,res,next)=>{res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Headers','Content-Type');next();});
 app.use(express.static(path.join(__dirname,'public')));
-app.get('/health',(_,res)=>res.json({ok:true,version:'2.1.0-stable'}));
+app.get('/health',(_,res)=>res.json({ok:true,version:'2.1.1-dns-ice-fix'}));
 app.get('/api/ice',(_,res)=>{
+  // Bewusst schlanke ICE-Liste:
+  // 1 stabiler STUN-Dienst für direkte P2P-Verbindungen
+  // + exakt der in Metered/Trickle-ICE erfolgreich getestete TURN-Endpunkt.
   const iceServers=[
-    {urls:'stun:stun.relay.metered.ca:80'}
+    {urls:'stun:stun.l.google.com:19302'}
   ];
 
   if(process.env.TURN_USERNAME&&process.env.TURN_CREDENTIAL){
-    const username=process.env.TURN_USERNAME;
-    const credential=process.env.TURN_CREDENTIAL;
     const configured=String(process.env.TURN_URL||'').trim();
-
     if(configured){
-      // Den exakt getesteten TURN-Endpunkt unverändert zuerst verwenden.
-      iceServers.push({urls:configured,username,credential});
-
-      // Falls Metered verwendet wird, zusätzliche Fallbacks ergänzen.
-      if(configured.includes('standard.relay.metered.ca')){
-        const fallbacks=[
-          'turn:standard.relay.metered.ca:80?transport=tcp',
-          'turn:standard.relay.metered.ca:443',
-          'turns:standard.relay.metered.ca:443?transport=tcp'
-        ];
-        for(const url of fallbacks){
-          if(url!==configured)iceServers.push({urls:url,username,credential});
-        }
-      }
+      iceServers.push({
+        urls:configured,
+        username:process.env.TURN_USERNAME,
+        credential:process.env.TURN_CREDENTIAL
+      });
     }
   }
 

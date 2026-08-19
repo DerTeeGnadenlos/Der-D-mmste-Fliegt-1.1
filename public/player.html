@@ -98,6 +98,12 @@ async function peer(init){
    else if(s==='connecting')$('status').textContent='Kamera verbunden – WebRTC verbindet…';
    else if(['failed','disconnected'].includes(s))$('status').textContent='Kamera verbunden – WebRTC nicht verbunden.';
  };
+ pc.oniceconnectionstatechange=()=>{
+   const s=pc?.iceConnectionState;
+   if(s==='checking')$('status').textContent='Kamera verbunden – ICE-Verbindung wird geprüft…';
+   if(s==='connected'||s==='completed')$('status').textContent='Kamera live mit der Show verbunden.';
+   if(s==='failed')$('status').textContent='Kamera verbunden – ICE fehlgeschlagen.';
+ };
  if(stream)stream.getTracks().forEach(t=>pc.addTrack(t,stream));
  if(init){
    const o=await pc.createOffer();
@@ -153,7 +159,19 @@ async function handle(m){
  await pc.setLocalDescription(a);
  send({type:'answer',sdp:pc.localDescription});
 }
- if(m.type==='answer'&&pc)await pc.setRemoteDescription(m.sdp);
+ if(m.type==='answer'&&pc){
+   await pc.setRemoteDescription(m.sdp);
+
+   // WICHTIG: Host-ICE kann bereits vor der Answer angekommen sein.
+   // Diese Kandidaten wurden gepuffert und müssen JETZT eingespielt werden.
+   const queued=[...pendingIce];
+   pendingIce=[];
+   for(const c of queued){
+     try{await pc.addIceCandidate(c)}catch(e){console.warn('Gepufferter ICE-Kandidat fehlgeschlagen',e)}
+   }
+
+   $('status').textContent='Kamera verbunden – Answer empfangen, ICE wird geprüft…';
+}
  if(m.type==='ice'&&m.candidate){
    if(pc&&pc.remoteDescription){
      try{await pc.addIceCandidate(m.candidate)}catch{}

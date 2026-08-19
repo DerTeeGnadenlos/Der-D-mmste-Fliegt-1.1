@@ -11,7 +11,7 @@ const rooms=new Map();
 
 app.use((req,res,next)=>{res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Headers','Content-Type');next();});
 app.use(express.static(path.join(__dirname,'public')));
-app.get('/health',(_,res)=>res.json({ok:true,version:'2.0.12-multi-answer-dots'}));
+app.get('/health',(_,res)=>res.json({ok:true,version:'2.0.13-metered-free-fix'}));
 app.get('/api/ice',(_,res)=>{
   const iceServers=[
     {urls:'stun:stun.relay.metered.ca:80'}
@@ -23,12 +23,20 @@ app.get('/api/ice',(_,res)=>{
     const configured=String(process.env.TURN_URL||'').trim();
 
     if(configured.includes('metered.ca')){
-      // Metered: UDP zuerst, danach TCP/TLS als Fallback.
+      // WICHTIG: Den vom Nutzer konfigurierten Metered-Host respektieren.
+      // Free-Tarif: standard.relay.metered.ca
+      // Paid: z.B. global.relay.metered.ca / eu.relay...
+      let host='standard.relay.metered.ca';
+      try{
+        const cleaned=configured.replace(/^turns?:\/\//,'');
+        host=cleaned.split(':')[0].split('?')[0]||host;
+      }catch{}
+
       iceServers.push(
-        {urls:'turn:global.relay.metered.ca:80',username,credential},
-        {urls:'turn:global.relay.metered.ca:80?transport=tcp',username,credential},
-        {urls:'turn:global.relay.metered.ca:443',username,credential},
-        {urls:'turns:global.relay.metered.ca:443?transport=tcp',username,credential}
+        {urls:`turn:${host}:80`,username,credential},
+        {urls:`turn:${host}:80?transport=tcp`,username,credential},
+        {urls:`turn:${host}:443`,username,credential},
+        {urls:`turns:${host}:443?transport=tcp`,username,credential}
       );
     }else if(configured){
       iceServers.push({
@@ -38,7 +46,6 @@ app.get('/api/ice',(_,res)=>{
     }
   }
 
-  // KEIN erzwungenes relay mehr. Browser darf direkte/STUN/TURN Wege vergleichen.
   res.json({iceServers,forceRelay:false});
 });
 app.get('/join/:room',(_,res)=>res.sendFile(path.join(__dirname,'public','player.html')));

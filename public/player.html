@@ -16,7 +16,7 @@
 </div>
 <audio id="sndCorrect"></audio><audio id="sndWrong"></audio><audio id="sndSafe"></audio><audio id="sndEliminate"></audio>
 <script>
-let ws,room,pc,stream,mediaPromise=null,playerId,currentVoteId,currentTiebreakId,selectedVoteTarget=null,iceServers=[{urls:'stun:stun.l.google.com:19302'}];let pendingIce=[];
+let ws,room,pc,stream,mediaPromise=null,playerId,currentVoteId,currentTiebreakId,selectedVoteTarget=null,forceRelay=false,iceServers=[{urls:'stun:stun.l.google.com:19302'}];let pendingIce=[];
 const $=id=>document.getElementById(id);const parts=location.pathname.split('/').filter(Boolean);if(parts[0]==='join'&&parts[1])$('room').value=parts[1].toUpperCase();
 let volume=Number(localStorage.getItem('ddf_volume')||65)/100;
 $('volume').value=Math.round(volume*100);
@@ -86,11 +86,11 @@ async function beep(kind){
     console.warn('Sound konnte nicht abgespielt werden',e);
   }
 }
-async function ice(){try{const r=await fetch('/api/ice'),j=await r.json();if(j.iceServers)iceServers=j.iceServers}catch{}}
+async function ice(){try{const r=await fetch('/api/ice'),j=await r.json();if(j.iceServers)iceServers=j.iceServers;forceRelay=!!j.forceRelay}catch{}}
 function send(o){if(ws?.readyState===1)ws.send(JSON.stringify({...o,room}))}
 async function peer(init){
  if(pc)return;
- pc=new RTCPeerConnection({iceServers});
+ pc=new RTCPeerConnection({iceServers,iceTransportPolicy:forceRelay?'relay':'all',iceCandidatePoolSize:10});
  pc.onicecandidate=e=>{if(e.candidate)send({type:'ice',candidate:e.candidate})};
  pc.onconnectionstatechange=()=>{
    const s=pc?.connectionState;

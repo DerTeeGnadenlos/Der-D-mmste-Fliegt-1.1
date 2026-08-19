@@ -11,13 +11,38 @@ const rooms=new Map();
 
 app.use((req,res,next)=>{res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Headers','Content-Type');next();});
 app.use(express.static(path.join(__dirname,'public')));
-app.get('/health',(_,res)=>res.json({ok:true,version:'2.0.9-host-camera-select'}));
+app.get('/health',(_,res)=>res.json({ok:true,version:'2.0.10-turn-windows-fix'}));
 app.get('/api/ice',(_,res)=>{
-  const iceServers=[{urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302']}];
-  if(process.env.TURN_URL&&process.env.TURN_USERNAME&&process.env.TURN_CREDENTIAL){
-    iceServers.push({urls:process.env.TURN_URL.split(',').map(x=>x.trim()).filter(Boolean),username:process.env.TURN_USERNAME,credential:process.env.TURN_CREDENTIAL});
+  const iceServers=[{urls:'stun:stun.relay.metered.ca:80'}];
+  let forceRelay=false;
+
+  if(process.env.TURN_USERNAME&&process.env.TURN_CREDENTIAL){
+    const username=process.env.TURN_USERNAME;
+    const credential=process.env.TURN_CREDENTIAL;
+    const configured=String(process.env.TURN_URL||'').trim();
+
+    // Metered empfiehlt mehrere Transportwege gleichzeitig:
+    // UDP 80, TCP 80, UDP 443 und TLS/TCP 443.
+    if(configured.includes('metered.ca')){
+      iceServers.push(
+        {urls:'turn:global.relay.metered.ca:80',username,credential},
+        {urls:'turn:global.relay.metered.ca:80?transport=tcp',username,credential},
+        {urls:'turn:global.relay.metered.ca:443',username,credential},
+        {urls:'turns:global.relay.metered.ca:443?transport=tcp',username,credential}
+      );
+    }else if(configured){
+      iceServers.push({
+        urls:configured.split(',').map(x=>x.trim()).filter(Boolean),
+        username,credential
+      });
+    }
+
+    // Bei konfiguriertem TURN bevorzugen wir für dieses Spiel Relay,
+    // weil direkte Verbindungen im Test bereits fehlgeschlagen sind.
+    forceRelay=String(process.env.TURN_FORCE_RELAY||'true').toLowerCase()!=='false';
   }
-  res.json({iceServers});
+
+  res.json({iceServers,forceRelay});
 });
 app.get('/join/:room',(_,res)=>res.sendFile(path.join(__dirname,'public','player.html')));
 

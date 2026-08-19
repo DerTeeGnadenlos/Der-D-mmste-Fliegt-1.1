@@ -91,7 +91,12 @@ function send(o){if(ws?.readyState===1)ws.send(JSON.stringify({...o,room}))}
 async function peer(init){
  if(pc)return;
  pc=new RTCPeerConnection({iceServers,iceTransportPolicy:'all',iceCandidatePoolSize:10});
- pc.onicecandidate=e=>{if(e.candidate)send({type:'ice',candidate:e.candidate})};
+ pc.onicecandidate=e=>{if(e.candidate)send({type:'ice',candidate:{
+   candidate:String(e.candidate.candidate||''),
+   sdpMid:e.candidate.sdpMid??null,
+   sdpMLineIndex:e.candidate.sdpMLineIndex??null,
+   usernameFragment:e.candidate.usernameFragment??null
+ }})};
  pc.onconnectionstatechange=()=>{
    const s=pc?.connectionState;
    if(s==='connected')$('status').textContent='Kamera live mit der Show verbunden.';
@@ -110,7 +115,10 @@ async function peer(init){
    await pc.setLocalDescription(o);
    $('status').textContent='Kamera verbunden – ICE wird gesammelt…';
    await waitIceComplete(pc,7000);
-   send({type:'offer',sdp:pc.localDescription});
+   send({type:'offer',sdp:{
+     type:String(pc.localDescription?.type||'offer'),
+     sdp:String(pc.localDescription?.sdp||'')
+   }});
    $('status').textContent='Kamera verbunden – WebRTC-Angebot gesendet…';
  }
 }
@@ -163,17 +171,24 @@ async function handle(m){
  await media();
  pc?.close();pc=null;pendingIce=[];
  await peer(false);
- await pc.setRemoteDescription(m.sdp);
+ const remoteOffer={type:String(m.sdp?.type||'offer'),sdp:String(m.sdp?.sdp||'')};
+  if(!remoteOffer.sdp)throw new Error('Offer-SDP ist leer.');
+  await pc.setRemoteDescription(remoteOffer);
  for(const c of pendingIce){try{await pc.addIceCandidate(c)}catch{}}
  pendingIce=[];
  const a=await pc.createAnswer();
  await pc.setLocalDescription(a);
- send({type:'answer',sdp:pc.localDescription});
+ send({type:'answer',sdp:{
+   type:String(pc.localDescription?.type||'answer'),
+   sdp:String(pc.localDescription?.sdp||'')
+ }});
 }
  if(m.type==='answer'&&pc){
    send({type:'client-signal-status',stage:'answer-received'});
    try{
-     await pc.setRemoteDescription(m.sdp);
+     const remoteAnswer={type:String(m.sdp?.type||'answer'),sdp:String(m.sdp?.sdp||'')};
+     if(!remoteAnswer.sdp)throw new Error('Answer-SDP ist leer.');
+     await pc.setRemoteDescription(remoteAnswer);
      send({type:'client-signal-status',stage:'answer-applied'});
    }catch(e){
      send({type:'client-signal-status',stage:'answer-error',message:String(e?.message||e)});

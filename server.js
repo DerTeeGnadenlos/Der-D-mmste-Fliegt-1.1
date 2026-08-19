@@ -11,7 +11,7 @@ const rooms=new Map();
 
 app.use((req,res,next)=>{res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Headers','Content-Type');next();});
 app.use(express.static(path.join(__dirname,'public')));
-app.get('/health',(_,res)=>res.json({ok:true,version:'2.0.17-answer-ack-fix'}));
+app.get('/health',(_,res)=>res.json({ok:true,version:'2.0.18-plain-sdp-fix'}));
 app.get('/api/ice',(_,res)=>{
   const iceServers=[
     {urls:'stun:stun.relay.metered.ca:80'}

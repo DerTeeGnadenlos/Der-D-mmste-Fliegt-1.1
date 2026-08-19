@@ -11,7 +11,7 @@ const rooms=new Map();
 
 app.use((req,res,next)=>{res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Headers','Content-Type');next();});
 app.use(express.static(path.join(__dirname,'public')));
-app.get('/health',(_,res)=>res.json({ok:true,version:'2.0.15-electron-turn-fix'}));
+app.get('/health',(_,res)=>res.json({ok:true,version:'2.0.16-signal-routing-fix'}));
 app.get('/api/ice',(_,res)=>{
   const iceServers=[
     {urls:'stun:stun.relay.metered.ca:80'}
@@ -50,6 +50,26 @@ function publicPlayer(p){return {id:p.id,name:p.name,lives:p.lives,safe:p.safe,c
 function publicPlayers(room){return [...room.players.values()].map(publicPlayer);}
 function broadcastPlayers(room,msg){for(const p of room.players.values())send(p.ws,msg);}
 function candidatesForVote(room){return [...room.players.values()].filter(p=>p.lives>0&&!p.safe).map(p=>({id:p.id,name:p.name}));}
+
+
+function sendToPlayer(roomCode,playerId,payload){
+ const r=rooms.get(roomCode);
+ if(!r)return false;
+ const p=r.players?.get ? r.players.get(playerId) : null;
+ const sock=p?.ws;
+ if(sock&&sock.readyState===1){
+   sock.send(JSON.stringify(payload));
+   return true;
+ }
+ // Fallback: search sockets carrying matching room/player metadata.
+ for(const client of wss.clients){
+   if(client.readyState===1 && client.room===roomCode && client.playerId===playerId){
+     client.send(JSON.stringify(payload));
+     return true;
+   }
+ }
+ return false;
+}
 
 wss.on('connection',ws=>{
   ws.on('message',raw=>{

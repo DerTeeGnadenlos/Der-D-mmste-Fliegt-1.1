@@ -29,7 +29,7 @@ app.post('/api/media',(req,res)=>{
     res.json({ok:true,url:'/media/'+id,size:buf.length});
   }catch(e){res.status(500).json({ok:false,error:e.message})}
 });
-app.get('/health',(_,res)=>res.json({ok:true,version:'3.1.0-big-stability-ui-patch'}));
+app.get('/health',(_,res)=>res.json({ok:true,version:'3.2.0-gameflow-final-patch'}));
 app.get('/api/ice',(_,res)=>{
   // Bewusst schlanke ICE-Liste:
   // 1 stabiler STUN-Dienst für direkte P2P-Verbindungen
@@ -86,7 +86,7 @@ wss.on('connection',ws=>{
 
     if(m.type==='create-room'){
       let code=roomCode();while(rooms.has(code))code=roomCode();
-      const room={code,host:ws,players:new Map(),vote:null,tiebreak:null,estimate:null,buzzer:null,imageQuestion:null,scene:'lobby'};
+      const room={code,host:ws,players:new Map(),vote:null,tiebreak:null,estimate:null,buzzer:null,imageQuestion:null,scene:'lobby',startLives:3};
       rooms.set(code,room);Object.assign(ws,{role:'host',room:code,id:'host'});
       send(ws,{type:'room-created',room:code,players:[]});return;
     }
@@ -105,7 +105,7 @@ wss.on('connection',ws=>{
         send(room.host,{type:'player-reconnected',player:publicPlayer(player)});
       }else{
         const id=crypto.randomUUID(),sessionToken=crypto.randomBytes(18).toString('hex');
-        player={id,sessionToken,name:String(m.name||'Spieler').trim().slice(0,30)||'Spieler',lives:3,safe:false,ready:false,color:'#4e7cff',ws};
+        player={id,sessionToken,name:String(m.name||'Spieler').trim().slice(0,30)||'Spieler',lives:room.startLives,safe:false,ready:false,color:'#4e7cff',ws};
         room.players.set(id,player);Object.assign(ws,{role:'player',room:code,id,sessionToken});
         send(ws,{type:'joined',room:code,player:publicPlayer(player),reconnected:false});
         send(room.host,{type:'player-joined',player:publicPlayer(player)});
@@ -114,7 +114,7 @@ wss.on('connection',ws=>{
       if(room.vote?.active){send(ws,{type:'vote-start',voteId:room.vote.id,candidates:room.vote.candidates});if(room.vote.votes.has(ws.id))send(ws,{type:'vote-accepted',targetId:room.vote.votes.get(ws.id)});}
       if(room.tiebreak?.active&&room.tiebreak.participants.includes(ws.id)){send(ws,{type:'tiebreak-start',tiebreakId:room.tiebreak.id});if(room.tiebreak.values.has(ws.id))send(ws,{type:'tiebreak-accepted'});}
       if(room.estimate?.active&&room.estimate.participants.includes(ws.id)){send(ws,{type:'estimate-start',estimateId:room.estimate.id});if(room.estimate.values.has(ws.id))send(ws,{type:'estimate-accepted'});}
-      if(room.buzzer?.active&&room.buzzer.participants.includes(ws.id)){send(ws,{type:'buzzer-start'});if(room.buzzer.winnerId){const bp=room.players.get(room.buzzer.winnerId);send(ws,{type:'buzzer-result',playerId:room.buzzer.winnerId,name:bp?.name||'Spieler',color:bp?.color||'#4e7cff'});}}
+      if(room.buzzer?.active&&room.buzzer.participants.includes(ws.id)){if(room.buzzer.blocked?.has(ws.id))send(ws,{type:'buzzer-locked'});else send(ws,{type:'buzzer-start'});if(room.buzzer.winnerId){const bp=room.players.get(room.buzzer.winnerId);send(ws,{type:'buzzer-result',playerId:room.buzzer.winnerId,name:bp?.name||'Spieler',color:bp?.color||'#4e7cff'});}}
       if(room.imageQuestion?.active&&room.imageQuestion.participants.includes(ws.id)){
         send(ws,{type:'image-question-start',id:room.imageQuestion.id,mode:room.imageQuestion.mode,url:room.imageQuestion.url,question:room.imageQuestion.question,color:player.color});
         if(room.imageQuestion.answers.has(ws.id))send(ws,{type:'image-answer-accepted'});if(room.imageQuestion.locked)send(ws,{type:'image-question-locked'});
@@ -136,7 +136,7 @@ wss.on('connection',ws=>{
         const p=room.players.get(ws.id);if(!p)return;
         p.ready=!!m.ready;send(room.host,{type:'player-ready',playerId:p.id,ready:p.ready});send(ws,{type:'ready-state',ready:p.ready});return;
       }
-      if(m.type==='buzz'&&room.buzzer?.active&&room.buzzer.participants.includes(ws.id)&&!room.buzzer.winnerId){
+      if(m.type==='buzz'&&room.buzzer?.active&&room.buzzer.participants.includes(ws.id)&&!room.buzzer.winnerId&&!room.buzzer.blocked?.has(ws.id)){
         room.buzzer.winnerId=ws.id;
         const p=room.players.get(ws.id);
         send(room.host,{type:'buzzer-winner',playerId:ws.id,name:p?.name||'Spieler'});
@@ -185,6 +185,7 @@ wss.on('connection',ws=>{
         send(ws,{type:'signal-delivery-ack',signal:m.type,playerId:m.playerId,delivered});
         return;
       }
+      if(m.type==='set-start-lives'){room.startLives=Math.max(1,Math.min(10,Number(m.value)||3));return;}
       if(m.type==='state'){
         const p=room.players.get(m.playerId);if(!p)return;
         if(typeof m.name==='string')p.name=m.name.trim().slice(0,30)||p.name;
@@ -228,13 +229,15 @@ wss.on('connection',ws=>{
       }
       if(m.type==='start-buzzer'){
         const ids=(m.playerIds||[]).filter(id=>room.players.has(id)&&room.players.get(id).lives>0);
-        room.buzzer={active:true,participants:ids,winnerId:null};room.scene='buzzer';
+        room.buzzer={active:true,participants:ids,winnerId:null,blocked:new Set()};room.scene='buzzer';
         for(const id of ids)send(room.players.get(id).ws,{type:'buzzer-start'});
         send(ws,{type:'buzzer-started',total:ids.length});return;
       }
       if(m.type==='reset-buzzer'&&room.buzzer){
+        if(m.newQuestion)room.buzzer.blocked=new Set();
+        else if(m.blockPlayerId)room.buzzer.blocked.add(m.blockPlayerId);
         room.buzzer.winnerId=null;
-        for(const id of room.buzzer.participants)send(room.players.get(id)?.ws,{type:'buzzer-start'});
+        for(const id of room.buzzer.participants){if(room.buzzer.blocked?.has(id))send(room.players.get(id)?.ws,{type:'buzzer-locked'});else send(room.players.get(id)?.ws,{type:'buzzer-start'});}
         broadcastPlayers(room,{type:'buzzer-reset'});return;
       }
       if(m.type==='end-buzzer'){
@@ -308,6 +311,7 @@ wss.on('connection',ws=>{
         for(const id of room.tiebreak.participants)send(room.players.get(id).ws,{type:'tiebreak-ended'});
         send(ws,{type:'tiebreak-result',values});return;
       }
+      if(m.type==='final-role'){const p=room.players.get(m.playerId);if(p)send(p.ws,{type:'final-role',role:m.role,label:m.label});return;}
       if(m.type==='set-player-volume'){
         const p=room.players.get(m.playerId);if(p)send(p.ws,{type:'host-volume',value:m.value});return;
       }
@@ -326,4 +330,4 @@ wss.on('connection',ws=>{
 });
 
 const port=process.env.PORT||3000;
-server.listen(port,'0.0.0.0',()=>console.log('Der Dümmste fliegt v2 Server auf Port '+port));
+server.listen(port,'0.0.0.0',()=>console.log('Der Dümmste fliegt v3.2 Server auf Port '+port));

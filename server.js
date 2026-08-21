@@ -29,7 +29,7 @@ app.post('/api/media',(req,res)=>{
     res.json({ok:true,url:'/media/'+id,size:buf.length});
   }catch(e){res.status(500).json({ok:false,error:e.message})}
 });
-app.get('/health',(_,res)=>res.json({ok:true,version:'3.2.0-gameflow-final-patch'}));
+app.get('/health',(_,res)=>res.json({ok:true,version:'3.3.0-qol-control-patch'}));
 app.get('/api/ice',(_,res)=>{
   // Bewusst schlanke ICE-Liste:
   // 1 stabiler STUN-Dienst für direkte P2P-Verbindungen
@@ -55,7 +55,7 @@ app.get('/join/:room',(_,res)=>res.sendFile(path.join(__dirname,'public','player
 
 function send(ws,msg){if(ws&&ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify(msg));}
 function roomCode(){const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<6;i++)s+=a[crypto.randomInt(a.length)];return s;}
-function publicPlayer(p){return {id:p.id,name:p.name,lives:p.lives,safe:p.safe,ready:!!p.ready,color:p.color||'#4e7cff',connected:!!p.ws&&p.ws.readyState===WebSocket.OPEN,sessionToken:p.sessionToken};}
+function publicPlayer(p){return {id:p.id,name:p.name,lives:p.lives,safe:p.safe,color:p.color||'#4e7cff',connected:!!p.ws&&p.ws.readyState===WebSocket.OPEN,sessionToken:p.sessionToken};}
 function publicPlayers(room){return [...room.players.values()].map(publicPlayer);}
 function broadcastPlayers(room,msg){for(const p of room.players.values())send(p.ws,msg);}
 function candidatesForVote(room){return [...room.players.values()].filter(p=>p.lives>0&&!p.safe).map(p=>({id:p.id,name:p.name}));}
@@ -105,12 +105,11 @@ wss.on('connection',ws=>{
         send(room.host,{type:'player-reconnected',player:publicPlayer(player)});
       }else{
         const id=crypto.randomUUID(),sessionToken=crypto.randomBytes(18).toString('hex');
-        player={id,sessionToken,name:String(m.name||'Spieler').trim().slice(0,30)||'Spieler',lives:room.startLives,safe:false,ready:false,color:'#4e7cff',ws};
+        player={id,sessionToken,name:String(m.name||'Spieler').trim().slice(0,30)||'Spieler',lives:room.startLives,safe:false,color:'#4e7cff',ws};
         room.players.set(id,player);Object.assign(ws,{role:'player',room:code,id,sessionToken});
         send(ws,{type:'joined',room:code,player:publicPlayer(player),reconnected:false});
         send(room.host,{type:'player-joined',player:publicPlayer(player)});
-      }
-      send(ws,{type:'ready-state',ready:!!player.ready});send(ws,{type:'scene',scene:room.scene||'main'});
+      }send(ws,{type:'scene',scene:room.scene||'main'});
       if(room.vote?.active){send(ws,{type:'vote-start',voteId:room.vote.id,candidates:room.vote.candidates});if(room.vote.votes.has(ws.id))send(ws,{type:'vote-accepted',targetId:room.vote.votes.get(ws.id)});}
       if(room.tiebreak?.active&&room.tiebreak.participants.includes(ws.id)){send(ws,{type:'tiebreak-start',tiebreakId:room.tiebreak.id});if(room.tiebreak.values.has(ws.id))send(ws,{type:'tiebreak-accepted'});}
       if(room.estimate?.active&&room.estimate.participants.includes(ws.id)){send(ws,{type:'estimate-start',estimateId:room.estimate.id});if(room.estimate.values.has(ws.id))send(ws,{type:'estimate-accepted'});}
@@ -131,10 +130,6 @@ wss.on('connection',ws=>{
       if(m.type==='client-signal-status'){
         send(room.host,{type:'client-signal-status',playerId:ws.id,stage:m.stage,message:m.message||''});
         return;
-      }
-      if(m.type==='ready-toggle'){
-        const p=room.players.get(ws.id);if(!p)return;
-        p.ready=!!m.ready;send(room.host,{type:'player-ready',playerId:p.id,ready:p.ready});send(ws,{type:'ready-state',ready:p.ready});return;
       }
       if(m.type==='buzz'&&room.buzzer?.active&&room.buzzer.participants.includes(ws.id)&&!room.buzzer.winnerId&&!room.buzzer.blocked?.has(ws.id)){
         room.buzzer.winnerId=ws.id;
@@ -224,7 +219,7 @@ wss.on('connection',ws=>{
       if(m.type==='set-scene'){room.scene=String(m.scene||'main');broadcastPlayers(room,{type:'scene',scene:room.scene});return;}
       if(m.type==='show-reset'){
         room.scene='main';
-        if(room.vote)room.vote.active=false;if(room.tiebreak)room.tiebreak.active=false;if(room.estimate)room.estimate.active=false;if(room.buzzer)room.buzzer.active=false;if(room.imageQuestion)room.imageQuestion.active=false;
+        room.vote=null;room.tiebreak=null;room.estimate=null;room.buzzer=null;room.imageQuestion=null;
         broadcastPlayers(room,{type:'show-reset'});return;
       }
       if(m.type==='start-buzzer'){

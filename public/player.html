@@ -21,18 +21,18 @@
 #submitVote{font-size:18px!important;padding:16px!important}
 .tie-hero{font-size:32px}
 
-.ready-btn.ready{background:#197448!important}.buzzer-panel{border:3px solid var(--gold)!important;text-align:center}.buzzer-title{font-size:30px;font-weight:1000;color:var(--gold);letter-spacing:.1em}.buzz-btn{width:100%;min-height:120px;margin-top:12px;font-size:38px;background:#b51f3b;border:4px solid #ff7890;box-shadow:0 0 32px #ff456a55}.buzz-btn:active{transform:scale(.98)}
+.buzzer-panel{border:3px solid var(--gold)!important;text-align:center}.buzzer-title{font-size:30px;font-weight:1000;color:var(--gold);letter-spacing:.1em}.buzz-btn{width:100%;min-height:120px;margin-top:12px;font-size:38px;background:#b51f3b;border:4px solid #ff7890;box-shadow:0 0 32px #ff456a55}.buzz-btn:active{transform:scale(.98)}
 .image-question-panel{border:2px solid var(--gold)!important}.image-question-panel h3{font-size:22px!important;text-align:center}.player-image-wrap{position:relative;width:100%;overflow:auto;touch-action:pan-x pan-y pinch-zoom;background:#030408;border-radius:12px}.player-image-wrap img{display:block;width:100%;height:auto;user-select:none}.my-image-pin{position:absolute;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:translate(-50%,-100%) rotate(-45deg);border:3px solid white;box-shadow:0 0 15px #000}.my-image-pin:after{content:"";position:absolute;inset:6px;border-radius:50%;background:white}.image-question-panel.locked{opacity:.75}
-.final-notice{font-size:24px;font-weight:1000;text-align:center;border:3px solid var(--gold)!important}.final-notice.mute{border-color:#ff456a!important;background:#3a101a!important}</style></head><body><div class="card">
+.camera-select{display:grid;grid-template-columns:1fr auto auto;gap:6px;margin:10px 0}.camera-select select{width:100%}.final-notice{font-size:24px;font-weight:1000;text-align:center;border:3px solid var(--gold)!important}.final-notice.mute{border-color:#ff456a!important;background:#3a101a!important}</style></head><body><div class="card">
 <h1>DER DÜMMSTE <i>FLIEGT</i></h1><p>Kamera verbinden und an Abstimmungen teilnehmen.</p>
 <div id="joinBox"><input id="room" placeholder="Raumcode"><input id="name" maxlength="30" placeholder="Dein Name"><button id="join" class="full">BEITRETEN</button></div>
 <div id="game" class="hidden"><div id="status" class="status">Verbunden…</div><div class="preview-wrap"><video id="preview" autoplay muted playsinline></video><div id="myTurn" class="my-turn hidden">DU BIST DRAN</div><div id="playerTimer" class="player-timer">00:30</div></div>
-<div class="zoom-control"><label>🔍 Kamera-Zoom <input id="cameraZoom" type="range" min="100" max="180" value="100"></label><span id="zoomText">100%</span></div><div class="stats"><span id="myName"></span><span>❤️ <b id="lives">3</b></span><span id="safe" class="safe"></span></div><div class="my-answer-panel">
+<div class="zoom-control"><label>🔍 Kamera-Zoom <input id="cameraZoom" type="range" min="100" max="180" value="100"></label><span id="zoomText">100%</span></div><div class="camera-select"><label>📷 Kamera <select id="cameraSelect"></select></label><button id="refreshCameraList" type="button">AKTUALISIEREN</button><button id="toggleCamera" type="button">KAMERA AUS</button></div><div class="stats"><span id="myName"></span><span>❤️ <b id="lives">3</b></span><span id="safe" class="safe"></span></div><div class="my-answer-panel">
 <div class="my-answer-label">DEINE ANTWORTEN</div>
 <div id="myAnswerDots" class="my-answer-dots"><span class="no-answers">Noch keine Antwort markiert.</span></div>
 </div>
-<div class="volume"><label for="volume">🔊</label><input id="volume" type="range" min="0" max="100" value="65"><span id="volumeText">65%</span></div>
-<button id="readyBtn" class="full ready-btn" type="button">ICH BIN BEREIT</button><div class="player-volume"><label>🔊 Show-Sounds <input id="soundVolume" type="range" min="0" max="100" value="70"></label><span id="soundVolumeText">70%</span></div>
+
+<div class="player-volume"><label>🔊 Show-Sounds <input id="soundVolume" type="range" min="0" max="100" value="70"></label><span id="soundVolumeText">70%</span></div>
 <div id="finalNotice" class="panel final-notice hidden"></div><div id="buzzerPanel" class="panel buzzer-panel hidden"><div class="buzzer-title">BUZZER</div><button id="buzzBtn" class="buzz-btn">🔔 BUZZ!</button><div id="buzzerStatus" class="status">PC: Leertaste · Handy: Button</div></div>
 <div id="imageQuestionPanel" class="panel image-question-panel hidden"><h3 id="imageQuestionTitle">BILDFRAGE</h3><div id="playerImageWrap" class="player-image-wrap"><img id="playerQuestionImage"><div id="myImagePin" class="my-image-pin hidden"></div></div><div id="imageTextArea" class="hidden"><input id="imageTextAnswer" placeholder="Deine Antwort"><button id="submitImageText" class="full">ANTWORT SENDEN</button></div><div id="imageQuestionStatus" class="status"></div></div>
 <div id="votePanel" class="panel vote-panel-big hidden"><div class="vote-hero">JETZT ABSTIMMEN</div><h3>🗳️ VOTING</h3><div id="voteChoices" class="choices"></div><button id="submitVote" class="full">STIMME ABGEBEN</button><div id="voteStatus" class="status"></div></div>
@@ -43,14 +43,7 @@
 <script>
 let ws,room,pc,stream,mediaPromise=null,playerId,currentVoteId,currentTiebreakId,currentEstimateId,currentImageId=null,currentImageMode=null,imageLocked=false,selectedVoteTarget=null,forceRelay=false,iceServers=[{urls:'stun:stun.l.google.com:19302'}];let pendingIce=[];
 const $=id=>document.getElementById(id);const parts=location.pathname.split('/').filter(Boolean);if(parts[0]==='join'&&parts[1])$('room').value=parts[1].toUpperCase();
-let volume=Number(localStorage.getItem('ddf_volume')||65)/100;
-$('volume').value=Math.round(volume*100);
-$('volumeText').textContent=Math.round(volume*100)+'%';
-$('volume').addEventListener('input',e=>{
-  volume=Number(e.target.value)/100;
-  localStorage.setItem('ddf_volume',e.target.value);
-  $('volumeText').textContent=e.target.value+'%';
-});
+let volume=Math.max(0,Math.min(1,Number(localStorage.getItem('ddf_sound_volume')||0.7)));
 
 let audioCtx=null;
 function getAudioCtx(){
@@ -170,23 +163,29 @@ function waitIceComplete(pc,timeout=6000){
    const timer=setTimeout(done,timeout);
  });
 }
+async function enumerateCameras(){
+ try{const ds=await navigator.mediaDevices.enumerateDevices(),cams=ds.filter(d=>d.kind==='videoinput'),sel=$('cameraSelect'),old=sel.value||localStorage.getItem('ddf_camera_id')||'';sel.innerHTML='';cams.forEach((d,i)=>{const o=document.createElement('option');o.value=d.deviceId;o.textContent=d.label||`Kamera ${i+1}`;sel.appendChild(o)});if(old&&cams.some(d=>d.deviceId===old))sel.value=old;return cams;}catch{return []}
+}
+async function setCamera(deviceId,{initial=false}={}){
+ try{
+   const constraints={video:{width:{ideal:1280},height:{ideal:720},...(deviceId?{deviceId:{exact:deviceId}}:{})},audio:false};
+   const newStream=await navigator.mediaDevices.getUserMedia(constraints),newTrack=newStream.getVideoTracks()[0];
+   if(!newTrack)throw new Error('Kein Videotrack erhalten.');
+   const sender=pc?.getSenders?.().find(s=>s.track?.kind==='video');
+   if(sender)await sender.replaceTrack(newTrack);
+   const oldStream=stream;stream=newStream;$('preview').srcObject=stream;
+   if(oldStream&&oldStream!==newStream)oldStream.getTracks().forEach(t=>t.stop());
+   const id=newTrack.getSettings().deviceId||deviceId||'';if(id)localStorage.setItem('ddf_camera_id',id);
+   await enumerateCameras();if(id&&[...$('cameraSelect').options].some(o=>o.value===id))$('cameraSelect').value=id;
+   $('toggleCamera').textContent='KAMERA AUS';$('status').textContent=initial?'Kamera verbunden.':'Kamera gewechselt – Verbindung bleibt aktiv.';
+   if(!initial&&ws?.readyState===1&&(!pc||['failed','disconnected','closed'].includes(pc.connectionState)||!sender)){try{pc?.close();pc=null;pendingIce=[];await peer(true)}catch(e){console.warn('Kamera-Neuverhandlung fehlgeschlagen',e)}}
+   return stream;
+ }catch(e){$('status').textContent='Kamera konnte nicht geöffnet werden: '+(e?.message||e);throw e}
+}
 async function media(){
- if(stream)return stream;
+ if(stream&&stream.getVideoTracks().some(t=>t.readyState==='live'))return stream;
  if(mediaPromise)return mediaPromise;
- mediaPromise=(async()=>{
-   try{
-     stream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720}},audio:false});
-     $('preview').srcObject=stream;
-     $('status').textContent='Kamera verbunden.';
-     return stream;
-   }catch(e){
-     $('status').textContent='Kamera nicht freigegeben. Du kannst trotzdem voten.';
-     return null;
-   }finally{
-     mediaPromise=null;
-   }
- })();
- return mediaPromise;
+ mediaPromise=(async()=>{try{await enumerateCameras();const preferred=$('cameraSelect').value||localStorage.getItem('ddf_camera_id')||'';return await setCamera(preferred,{initial:true});}catch{$('status').textContent='Kamera nicht freigegeben. Du kannst trotzdem voten.';return null}finally{mediaPromise=null}})();return mediaPromise;
 }
 async function join(){await unlockAudio();room=$('room').value.trim().toUpperCase();const name=$('name').value.trim()||'Spieler';if(!room)return alert('Raumcode eingeben.');await ice();const token=localStorage.getItem('ddf_token_'+room);ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);ws.onopen=()=>send({type:'join-room',name,sessionToken:token});ws.onmessage=async e=>handle(JSON.parse(e.data));ws.onclose=()=>{$('status').textContent='Verbindung verloren – erneuter Verbindungsversuch…';setTimeout(join,2500)}}
 async function handle(m){
@@ -255,7 +254,6 @@ async function handle(m){
  if(m.type==='effect')beep(m.effect);
  if(m.type==='player-turn')$('myTurn').classList.toggle('hidden',!m.active);
  if(m.type==='timer-update'){const s=Math.max(0,Number(m.left)||0);$('playerTimer').textContent=`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;$('playerTimer').classList.toggle('danger',s<=5&&s>0);if(m.running&&s<=5&&s>0)beep('tick');if(s===0&&!m.running)beep('timeup');}
- if(m.type==='ready-state'){$('readyBtn').classList.toggle('ready',!!m.ready);$('readyBtn').textContent=m.ready?'BEREIT ✓':'ICH BIN BEREIT';}
  if(m.type==='final-role'){const n=$('finalNotice');n.textContent=m.label||'';n.classList.toggle('hidden',!m.label);n.classList.toggle('mute',m.role==='mute');}
  if(m.type==='show-reset'){$('buzzerPanel').classList.add('hidden');$('imageQuestionPanel').classList.add('hidden');$('votePanel').classList.add('hidden');$('tiebreakPanel').classList.add('hidden');$('estimatePanel').classList.add('hidden');}
  if(m.type==='buzzer-start'){$('buzzerPanel').classList.remove('hidden');$('buzzerStatus').textContent='BUZZER OFFEN – PC: Leertaste';}
@@ -329,11 +327,15 @@ async function handle(m){
 $('join').addEventListener('click',join);$('soundVolume').value=Math.round(volume*100);$('soundVolumeText').textContent=Math.round(volume*100)+'%';$('soundVolume').addEventListener('input',e=>{volume=Number(e.target.value)/100;$('soundVolumeText').textContent=e.target.value+'%';localStorage.setItem('ddf_sound_volume',String(volume));});$('submitVote').addEventListener('click',()=>{
  if(!selectedVoteTarget)return alert('Bitte zuerst einen Spieler antippen.');
  send({type:'submit-vote',voteId:currentVoteId,targetId:selectedVoteTarget});
-});$('readyBtn').addEventListener('click',()=>{const ready=!$('readyBtn').classList.contains('ready');send({type:'ready-toggle',ready});});
+});
 $('buzzBtn').addEventListener('click',buzz);
 document.addEventListener('keydown',e=>{if(e.code==='Space'&&!e.repeat&&!e.target.matches('input,textarea,select')&&!$('buzzerPanel').classList.contains('hidden')){e.preventDefault();buzz();}});
 $('playerImageWrap').addEventListener('click',e=>{if(currentImageMode!=='pin'||imageLocked)return;const img=$('playerQuestionImage'),r=img.getBoundingClientRect();const x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;if(x<0||x>1||y<0||y>1)return;const p=$('myImagePin');p.style.left=(x*100)+'%';p.style.top=(y*100)+'%';p.style.background=getComputedStyle(document.documentElement).getPropertyValue('--gold');p.classList.remove('hidden');send({type:'image-pin',id:currentImageId,x,y});});
 $('submitImageText').addEventListener('click',()=>{if(imageLocked)return;const text=$('imageTextAnswer').value.trim();if(!text)return;send({type:'image-text',id:currentImageId,text});});
+$('refreshCameraList').addEventListener('click',enumerateCameras);
+$('cameraSelect').addEventListener('change',async e=>{try{await setCamera(e.target.value)}catch{}});
+$('toggleCamera').addEventListener('click',async()=>{const track=stream?.getVideoTracks?.()[0];if(track&&track.enabled){track.enabled=false;$('toggleCamera').textContent='KAMERA AN';$('status').textContent='Kamera lokal ausgeschaltet.';}else if(track&&track.readyState==='live'){track.enabled=true;$('toggleCamera').textContent='KAMERA AUS';$('status').textContent='Kamera wieder aktiv.';}else{try{await setCamera($('cameraSelect').value||localStorage.getItem('ddf_camera_id')||'')}catch{}}});
+navigator.mediaDevices?.addEventListener?.('devicechange',async()=>{await enumerateCameras();const track=stream?.getVideoTracks?.()[0];if(track&&track.readyState==='ended'){try{await setCamera($('cameraSelect').value||'')}catch{}}});
 $('cameraZoom').addEventListener('input',e=>{const z=Number(e.target.value)||100;$('zoomText').textContent=z+'%';$('preview').style.transform=`scale(${z/100})`;});
 $('submitEstimate').addEventListener('click',()=>{const v=$('estimateValue').value.trim();if(!v)return alert('Bitte eine Zahl eingeben.');send({type:'submit-estimate',estimateId:currentEstimateId,value:v})});
 $('submitTiebreak').addEventListener('click',()=>{const v=$('tiebreakValue').value.trim();if(!v)return alert('Bitte eine Zahl eingeben.');send({type:'submit-tiebreak',tiebreakId:currentTiebreakId,value:v})});
